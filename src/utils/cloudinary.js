@@ -19,3 +19,7 @@ cloudinary.config({
         return null
     }
   }
+
+  export {
+    uploadOnCloudinary
+  }

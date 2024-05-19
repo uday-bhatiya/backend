@@ -202,14 +202,14 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
 
 })
 
-const changePassword = asyncHandler( async ( req, res) => {
+const changePassword = asyncHandler(async (req, res) => {
 
-    const {oldPassword, newPassword, confPassword} = req.body
+    const { oldPassword, newPassword, confPassword } = req.body
 
     if (!(oldPassword || newPassword || confPassword)) {
         throw new ApiErrors(400, "All fields are required")
     }
-    if ( newPassword !== confPassword) {
+    if (newPassword !== confPassword) {
         throw new ApiErrors(400, " New password and confirm password must be same")
     }
     if (oldPassword === newPassword) {
@@ -225,25 +225,25 @@ const changePassword = asyncHandler( async ( req, res) => {
     }
 
     user.password = newPassword
-    await user.save({validateBeforeSave: false})
+    await user.save({ validateBeforeSave: false })
 
     return res
-    .status(200)
-    .json(
-        new ApiResponse(200,{},"Password changed successfully")
-    )
+        .status(200)
+        .json(
+            new ApiResponse(200, {}, "Password changed successfully")
+        )
 })
 
-const getCurrentUser = asyncHandler( async (req, res) => {
+const getCurrentUser = asyncHandler(async (req, res) => {
     return res
-    .status(200)
-    .json(
-        new ApiResponse(200, req.user, "Current user fetched successfully")
-    )
+        .status(200)
+        .json(
+            new ApiResponse(200, req.user, "Current user fetched successfully")
+        )
 })
 
-const updateAccountDetails = asyncHandler( async (req, res) => {
-    const {fullName, email} = req.body
+const updateAccountDetails = asyncHandler(async (req, res) => {
+    const { fullName, email } = req.body
 
     if (!(fullName || email)) {
         throw new ApiErrors(400, "All fields are required")
@@ -254,14 +254,14 @@ const updateAccountDetails = asyncHandler( async (req, res) => {
             fullName,
             email
         }
-    },{new: true}).select("-password")
+    }, { new: true }).select("-password")
 
     return res
-    .status(200)
-    .json(new ApiResponse(200, user, "Account details updated successfully"))
+        .status(200)
+        .json(new ApiResponse(200, user, "Account details updated successfully"))
 })
 
-const updateUserCoverImage = asyncHandler( async (req, res) => {
+const updateUserCoverImage = asyncHandler(async (req, res) => {
     const coverImageLocalPath = req.file?.path
     if (!coverImageLocalPath) {
         throw new ApiErrors(400, "Cover Image file not found")
@@ -277,15 +277,15 @@ const updateUserCoverImage = asyncHandler( async (req, res) => {
         $set: {
             coverImage: coverImage.url
         }
-    }, {new: true}).select("-password")
+    }, { new: true }).select("-password")
 
     return res
-    .status(200)
-    .json(new ApiResponse(200, user, "Cover image updated successfully"))
+        .status(200)
+        .json(new ApiResponse(200, user, "Cover image updated successfully"))
 
 })
 
-const updateUserAvatar = asyncHandler( async (req, res) => {
+const updateUserAvatar = asyncHandler(async (req, res) => {
     const avatarLocalPath = req.file?.path
     if (!avatarLocalPath) {
         throw new ApiErrors(400, "Avatar file not found")
@@ -301,17 +301,17 @@ const updateUserAvatar = asyncHandler( async (req, res) => {
         $set: {
             avatar: avatar.url
         }
-    }, {new: true}).select("-password")
+    }, { new: true }).select("-password")
 
     return res
-    .status(200)
-    .json(new ApiResponse(200, user, "Avatar updated successfully"))
+        .status(200)
+        .json(new ApiResponse(200, user, "Avatar updated successfully"))
 
 })
 
-const getUserChannelProfile = asyncHandler( async (req,res) => {
+const getUserChannelProfile = asyncHandler(async (req, res) => {
     console.log(req)
-    const {username} = req.params
+    const { username } = req.params
 
     if (!username?.trim()) {
         throw new ApiErrors(400, "Username not found")
@@ -349,7 +349,7 @@ const getUserChannelProfile = asyncHandler( async (req,res) => {
                 },
                 isChannelSubscribed: {
                     $cond: {
-                        if: {$in: [req.user?._id, "$subscribers.subscribers"]},
+                        if: { $in: [req.user?._id, "$subscribers.subscribers"] },
                         then: true,
                         else: false
                     }
@@ -374,60 +374,71 @@ const getUserChannelProfile = asyncHandler( async (req,res) => {
     }
 
     return res
-    .status(200)
-    .json(new ApiResponse(200, channel[0], "User channel fetched successfully"))
+        .status(200)
+        .json(new ApiResponse(200, channel[0], "User channel fetched successfully"))
 })
 
-const getWatchHistory = asyncHandler( async (req, res) => {
-    const user = await User.aggregate([
-        {
-            $match: {
-                _id: new mongoose.Types.ObjectId(req.user._id)
-            }
-        },
-        {
-            $lookup: {
-                from: "videos",
-                localField: "watchHistory",
-                foreignField: "_id",
-                as: "watchHistory",
-                pipeline: [
-                    {
-                        $lookup: {
-                            from: 'users',
-                            localField: "owner",
-                            foreignField: "_id",
-                            as: "owner",
-                            pipeline: [
-                                {
-                                    $project: {
-                                        fullName: 1,
-                                        username: 1,
-                                        avatar: 1,
-
-                                    }
+const getWatchHistory = asyncHandler(async (req, res) => {
+    try {
+        const user = await User.aggregate([
+            {
+                $match: {
+                    _id: new mongoose.Types.ObjectId(req.user._id)
+                }
+            },
+            {
+                $lookup: {
+                    from: "videos",
+                    let: { watchHistory: "$watchHistory" },
+                    pipeline: [
+                        {
+                            $match: {
+                                $expr: {
+                                    $in: ["$_id", "$$watchHistory"]
                                 }
-                            ]
-                        }
-                    },
-                    {
-                        $addFields: {
-                            owner: {
-                                $first: "owner"
+                            }
+                        },
+                        {
+                            $lookup: {
+                                from: 'users',
+                                localField: "owner",
+                                foreignField: "_id",
+                                as: "owner",
+                                pipeline: [
+                                    {
+                                        $project: {
+                                            fullName: 1,
+                                            username: 1,
+                                            avatar: 1,
+                                        }
+                                    }
+                                ]
+                            }
+                        },
+                        {
+                            $addFields: {
+                                owner: {
+                                    $arrayElemAt: ["$owner", 0]
+                                }
                             }
                         }
-                    }
-                ]
+                    ],
+                    as: "watchHistory"
+                }
             }
+        ]);
 
+        if (!user || user.length === 0) {
+            return res.status(404).json(new ApiResponse(404, null, "User not found"));
         }
-    ])
 
-    return res
-    .status(200)
-    .json(
-        new ApiResponse(200, user[0].WatchHistory, "Watch history fetched successfully")
-    )
-})
+        return res.status(200).json(
+            new ApiResponse(200, user[0].watchHistory, "Watch history fetched successfully")
+        );
+    } catch (error) {
+        return res.status(500).json(new ApiResponse(500, null, "Server error"));
+    }
+});
+
 
 export { registerUser, loginUser, logoutUser, refreshAccessToken, changePassword, getCurrentUser, updateAccountDetails, updateUserAvatar, updateUserCoverImage, getUserChannelProfile, getWatchHistory }
